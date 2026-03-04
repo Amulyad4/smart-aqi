@@ -15,7 +15,7 @@ from sklearn.preprocessing import LabelEncoder
 st.set_page_config(page_title="Smart AQI Dashboard", layout="wide")
 
 # --------------------------------------------------
-# TRAIN MODEL IF FILE NOT PRESENT
+# TRAIN MODEL IF NOT EXIST
 # --------------------------------------------------
 def train_model():
 
@@ -29,7 +29,6 @@ def train_model():
     df['Day'] = df['Date'].dt.day
 
     df = df.dropna(subset=['PM2.5'])
-
     df.fillna(df.median(numeric_only=True), inplace=True)
 
     df['PM2.5_lag1'] = df.groupby('City')['PM2.5'].shift(1)
@@ -44,11 +43,7 @@ def train_model():
     X = df[features]
     y = df['PM2.5']
 
-    model = RandomForestRegressor(
-        n_estimators=100,
-        random_state=42
-    )
-
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X,y)
 
     pickle.dump(model, open("model.pkl","wb"))
@@ -107,22 +102,99 @@ status, color = aqi_category(pm25)
 # --------------------------------------------------
 # HEADER
 # --------------------------------------------------
-st.title("🌍 Smart City Air Quality Intelligence System")
-st.caption("Real-time AQI Monitoring & 7-Day AI Forecasting Dashboard")
+st.markdown(f"""
+<h1 style='font-size:42px; margin-bottom:0;'>
+🌍 Smart City Air Quality Intelligence System
+</h1>
+<p style='color:gray; margin-top:5px;'>
+Real-time AQI Monitoring & 7-Day AI Forecasting Dashboard
+</p>
+""", unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # --------------------------------------------------
-# AQI DISPLAY
+# HERO SECTION (YOUR ORIGINAL DESIGN)
 # --------------------------------------------------
 st.markdown(f"""
-### 🔴 LIVE AQI • {city}
+<div style="
+background:
+    linear-gradient(135deg, {color}90 0%, #1c1f26 40%, #0e1117 100%);
+padding:50px;
+border-radius:30px;
+box-shadow:
+    0 0 60px {color}55,
+    inset 0 0 80px rgba(255,255,255,0.05);
+position: relative;
+overflow: hidden;
+">
 
-# {int(pm25)}
+<div style="
+position:absolute;
+top:-50px;
+right:-50px;
+width:200px;
+height:200px;
+background:{color};
+opacity:0.15;
+filter:blur(100px);
+border-radius:50%;
+"></div>
 
-Air Quality: **{status}**
+<h4 style="margin:0; opacity:0.9;">
+🔴 LIVE AQI • {city}
+</h4>
 
-PM2.5: {round(pm25,2)} µg/m³  
+<h1 style="
+    font-size:100px;
+    margin:10px 0;
+    font-weight:900;
+    text-shadow: 0px 0px 30px {color};
+">
+    {int(pm25)}
+</h1>
+
+<h3 style="margin-top:5px; font-weight:500;">
+Air Quality is <span style="color:white;">{status}</span>
+</h3>
+
+<p style="margin-top:25px; font-size:17px; opacity:0.85;">
+PM2.5: {round(pm25,2)} µg/m³ &nbsp;&nbsp; | &nbsp;&nbsp;
 PM10: {round(pm10,2)}
-""")
+</p>
+
+</div>
+""", unsafe_allow_html=True)
+
+# --------------------------------------------------
+# WEATHER + INSIGHT CARDS
+# --------------------------------------------------
+col3, col4 = st.columns(2)
+
+with col3:
+    st.markdown("""
+    <div style="
+    background:#1c1f26;
+    padding:25px;
+    border-radius:15px;">
+    <h4>🌤 Weather Snapshot</h4>
+    <p>Temperature: 27°C</p>
+    <p>Humidity: 58%</p>
+    <p>Wind Speed: 4.7 km/h</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+    st.markdown("""
+    <div style="
+    background:#1c1f26;
+    padding:25px;
+    border-radius:15px;">
+    <h4>📊 AI Insight</h4>
+    <p>This forecast uses time-series ML with lag & rolling features.</p>
+    <p>Click below to generate 7-day prediction.</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --------------------------------------------------
 # FORECAST
@@ -169,7 +241,8 @@ if st.button("Generate Forecast 🚀"):
         forecast_df,
         x="Date",
         y="Predicted PM2.5",
-        markers=True
+        markers=True,
+        template="plotly_dark"
     )
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, width="stretch")
