@@ -1,10 +1,5 @@
 import os
 import subprocess
-
-# If model file not present, train it
-if not os.path.exists("model.pkl"):
-    subprocess.run(["python", "train_model.py"])
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -13,16 +8,34 @@ from datetime import timedelta
 import plotly.express as px
 
 # --------------------------------------------------
-# PAGE CONFIG (MUST BE FIRST)
+# PAGE CONFIG
 # --------------------------------------------------
 st.set_page_config(page_title="Smart AQI Dashboard", layout="wide")
 
 # --------------------------------------------------
-# LOAD MODEL & DATA
+# TRAIN MODEL IF NOT EXISTS
 # --------------------------------------------------
-model = pickle.load(open("model.pkl", "rb"))
-le = pickle.load(open("encoder.pkl", "rb"))
+if not os.path.exists("model.pkl") or not os.path.exists("encoder.pkl"):
+    subprocess.run(["python", "train_model.py"])
 
+# --------------------------------------------------
+# LOAD MODEL (CACHED)
+# --------------------------------------------------
+@st.cache_resource
+def load_model():
+    with open("model.pkl", "rb") as f:
+        model = pickle.load(f)
+
+    with open("encoder.pkl", "rb") as f:
+        encoder = pickle.load(f)
+
+    return model, encoder
+
+model, le = load_model()
+
+# --------------------------------------------------
+# LOAD DATA
+# --------------------------------------------------
 df = pd.read_csv("air_quality.csv")
 df["Date"] = pd.to_datetime(df["Date"])
 
@@ -39,7 +52,7 @@ pm25 = latest["PM2.5"]
 pm10 = latest["PM10"] if "PM10" in city_df.columns else 0
 
 # --------------------------------------------------
-# AQI CATEGORY FUNCTION
+# AQI CATEGORY
 # --------------------------------------------------
 def aqi_category(value):
     if value <= 30:
@@ -66,56 +79,32 @@ Real-time AQI Monitoring & 7-Day AI Forecasting Dashboard
 """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
-# --------------------------------------------------
-# HERO SECTION (Premium Multi-Gradient Version)
-# --------------------------------------------------
 
-status, color = aqi_category(pm25)
-
+# --------------------------------------------------
+# HERO SECTION
+# --------------------------------------------------
 st.markdown(f"""
 <div style="
-background:
-    linear-gradient(135deg, {color}90 0%, #1c1f26 40%, #0e1117 100%);
+background: linear-gradient(135deg, {color}90 0%, #1c1f26 40%, #0e1117 100%);
 padding:50px;
 border-radius:30px;
-box-shadow:
-    0 0 60px {color}55,
-    inset 0 0 80px rgba(255,255,255,0.05);
-position: relative;
-overflow: hidden;
+box-shadow:0 0 60px {color}55;
 ">
 
-<div style="
-position:absolute;
-top:-50px;
-right:-50px;
-width:200px;
-height:200px;
-background:{color};
-opacity:0.15;
-filter:blur(100px);
-border-radius:50%;
-"></div>
-
-<h4 style="margin:0; opacity:0.9;">
-🔴 LIVE AQI • {city}
-</h4>
+<h4>🔴 LIVE AQI • {city}</h4>
 
 <h1 style="
-    font-size:100px;
-    margin:10px 0;
-    font-weight:900;
-    text-shadow: 0px 0px 30px {color};
+font-size:90px;
+font-weight:900;
+text-shadow:0px 0px 30px {color};
 ">
-    {int(pm25)}
+{int(pm25)}
 </h1>
 
-<h3 style="margin-top:5px; font-weight:500;">
-Air Quality is <span style="color:white;">{status}</span>
-</h3>
+<h3>Air Quality is {status}</h3>
 
-<p style="margin-top:25px; font-size:17px; opacity:0.85;">
-PM2.5: {round(pm25,2)} µg/m³ &nbsp;&nbsp; | &nbsp;&nbsp;
+<p>
+PM2.5: {round(pm25,2)} µg/m³ |
 PM10: {round(pm10,2)}
 </p>
 
@@ -123,16 +112,13 @@ PM10: {round(pm10,2)}
 """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# WEATHER + INSIGHT CARDS
+# INFO CARDS
 # --------------------------------------------------
 col3, col4 = st.columns(2)
 
 with col3:
     st.markdown("""
-    <div style="
-    background:#1c1f26;
-    padding:25px;
-    border-radius:15px;">
+    <div style="background:#1c1f26;padding:25px;border-radius:15px;">
     <h4>🌤 Weather Snapshot</h4>
     <p>Temperature: 27°C</p>
     <p>Humidity: 58%</p>
@@ -142,10 +128,7 @@ with col3:
 
 with col4:
     st.markdown("""
-    <div style="
-    background:#1c1f26;
-    padding:25px;
-    border-radius:15px;">
+    <div style="background:#1c1f26;padding:25px;border-radius:15px;">
     <h4>📊 AI Insight</h4>
     <p>This forecast uses time-series ML with lag & rolling features.</p>
     <p>Click below to generate 7-day prediction.</p>
@@ -153,7 +136,7 @@ with col4:
     """, unsafe_allow_html=True)
 
 # --------------------------------------------------
-# FORECAST SECTION
+# FORECAST
 # --------------------------------------------------
 st.markdown("## 📈 7-Day AI Forecast")
 
@@ -168,6 +151,7 @@ if st.button("Generate Forecast 🚀"):
     dates = []
 
     for i in range(1,8):
+
         next_date = last_date + timedelta(days=i)
 
         input_data = np.array([[
@@ -200,4 +184,4 @@ if st.button("Generate Forecast 🚀"):
         template="plotly_dark"
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
